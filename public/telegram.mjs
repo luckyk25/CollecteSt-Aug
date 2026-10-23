@@ -17,7 +17,7 @@ function render(){
  for(const recipient of config.recipients){
   const row=document.createElement('article');row.className='telegram-recipient';
   const name=document.createElement('strong');name.textContent=recipient.username?'@'+recipient.username:recipient.name;
-  const info=document.createElement('p');info.textContent=`${recipient.address} · Secteur ${recipient.sector} · La veille à 18 h`;
+  const info=document.createElement('p');info.textContent=`${recipient.address===`Secteur ${recipient.sector}`?recipient.address:`${recipient.address} · Secteur ${recipient.sector}`} · La veille à 18 h`;
   const types=document.createElement('p');const labels={garbage:'Ordures',recycling:'Recyclage',green:'Résidus verts',bulky:'Encombrants'};types.textContent=recipient.types.map(t=>labels[t]).join(' · ');
   const actions=document.createElement('div');actions.className='telegram-actions';
   const test=document.createElement('button');test.type='button';test.className='button secondary';test.textContent='Envoyer un test';test.disabled=!config.ready;
@@ -34,9 +34,9 @@ async function sync(){
  if(polling||!config.ready)return;
  polling=true;
  try{
-  config=await api('sync'+(pending?'?invite='+encodeURIComponent(pending.id):''),{method:'POST'});render();
-  if(pending&&config.linkConnected){
-   pending=null;$('telegram-link-panel').hidden=true;feedback('Compte connecté ! Vos rappels sont activés. Vous pouvez connecter un autre membre de la famille.');
+  config=await api('status');render();
+  if(pending&&(config.connectedInvites||[]).includes(pending.id)){
+   pending=null;$('telegram-link-panel').hidden=true;feedback('Telegram est connecté ! Vos rappels sont activés. Vous pouvez connecter un autre membre de la famille.');
   }
  }catch(e){feedback(e.message,true);}finally{polling=false;}
 }

@@ -74,3 +74,6 @@ service-account*.json
 # Markdown documentation stays local and is not published.
 *.[mM][dD]
 *.[mM][aA][rR][kK][dD][oO][wW][nN]
+
+/dist-cloudflare/
+/.cloudflare/
