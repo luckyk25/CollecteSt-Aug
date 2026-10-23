@@ -1,0 +1,27 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1792542715384,
+      "tag": "0000_keen_valeria_richards",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1792709436305,
+      "tag": "0001_fearless_marrow",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1792791119363,
+      "tag": "0002_telegram-query-indexes",
+      "breakpoints": true
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+import assert from 'node:assert/strict';
+import {body,userId,sameOrigin,failure} from './lib/api.mjs';
+const request=(value,headers={})=>new Request('https://collecte.example/api/telegram/link',{method:'POST',headers:{'Content-Type':'application/json',...headers},body:value});
+assert.deepEqual(await body(request('{"types":["green"]}')), {types:['green']});
+for(const value of ['null','[]','42','"text"','{'])await assert.rejects(body(request(value)),e=>e.status===400);
+await assert.rejects(body(request('{}',{'Content-Type':'text/plain'})),e=>e.status===415);
+await assert.rejects(body(request('{}',{'Content-Type':'application/json-invalid'})),e=>e.status===415);
+await assert.rejects(body(request('x'.repeat(4097))),e=>e.status===413);
+// Enforce bytes, not JavaScript character count, and reject chunked bodies early.
+await assert.rejects(body(request(JSON.stringify({value:'é'.repeat(2100)}))),e=>e.status===413);
+await assert.rejects(body(request('{}',{'Content-Length':'5000'})),e=>e.status===413);
+let cancelled=false;
+const stream=new ReadableStream({pull(controller){controller.enqueue(new Uint8Array(5000));},cancel(){cancelled=true;}});
+await assert.rejects(body(new Request('https://collecte.example/api/test',{method:'POST',headers:{'Content-Type':'application/json'},body:stream,duplex:'half'})),e=>e.status===413);
+assert(cancelled);
+assert.throws(()=>userId(request('{}')),e=>e.status===401);
+assert.throws(()=>sameOrigin(request('{}',{'Origin':'https://other.example'})),e=>e.status===403);
+sameOrigin(request('{}',{'Origin':'https://collecte.example'}));
+const response=failure(new Error('private implementation detail'));
+assert.equal(response.status,503);assert(!(await response.text()).includes('private implementation detail'));
+console.log('API checks passed: bounded streaming JSON, byte limits, invalid objects, authentication, origin validation and safe errors.');

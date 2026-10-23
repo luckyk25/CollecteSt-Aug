@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="Ma collecte : un bac de recyclage et une feuille">
+ <rect width="1024" height="1024" fill="#1d4638"/>
+ <circle cx="512" cy="512" r="454" fill="#285541"/>
+ <circle cx="512" cy="512" r="427" fill="none" stroke="#84a675" stroke-opacity=".4" stroke-width="3"/>
+ <g transform="translate(600 157) rotate(28 80 100)">
+  <path d="M80 0C28 38 5 76 5 114a75 75 0 0 0 150 0C155 76 132 38 80 0Z" fill="#c9dda3"/>
+  <path d="M80 39v185m0-119-34-27m34 27 34-27m-34 80-44-35m44 35 44-35" fill="none" stroke="#587d4e" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+ </g>
+ <path d="M306 385h412l-35 369a32 32 0 0 1-32 29H373a32 32 0 0 1-32-29Z" fill="#4e94be"/>
+ <path d="m351 410 29 326h227l32-326" fill="#337da9"/>
+ <path d="m341 421 28 304" stroke="#91c5df" stroke-width="9" stroke-linecap="round"/>
+ <rect x="279" y="329" width="466" height="66" rx="22" fill="#9ccfe3"/>
+ <path d="m305 329 30-42h354l30 42" fill="#c1e2eb"/>
+ <path d="M453 286v-20h118v20" fill="none" stroke="#d4eced" stroke-width="20" stroke-linejoin="round"/>
+ <svg x="397" y="444" width="230" height="230" viewBox="0 0 24 24" color="#f6f6ee"><path d="M21.82,15.42L19.32,19.75C18.83,20.61 17.92,21.06 17,21H15V23L12.5,18.5L15,14V16H17.82L15.6,12.15L19.93,9.65L21.73,12.77C22.25,13.54 22.32,14.57 21.82,15.42M9.21,3.06H14.21C15.19,3.06 16.04,3.63 16.45,4.45L17.45,6.19L19.18,5.19L16.54,9.6L11.39,9.69L13.12,8.69L11.71,6.24L9.5,10.09L5.16,7.59L6.96,4.47C7.37,3.64 8.22,3.06 9.21,3.06M5.05,19.76L2.55,15.43C2.06,14.58 2.13,13.56 2.64,12.79L3.64,11.06L1.91,10.06L7.05,10.14L9.7,14.56L7.97,13.56L6.56,16H11V21H7.4C6.47,21.07 5.55,20.61 5.05,19.76Z" style="fill:currentColor;stroke:none"/></svg>
+ <circle cx="390" cy="791" r="30" fill="#102f23"/><circle cx="634" cy="791" r="30" fill="#102f23"/>
+ <circle cx="390" cy="791" r="11" fill="#a5b99b"/><circle cx="634" cy="791" r="11" fill="#a5b99b"/>
+ </svg>
