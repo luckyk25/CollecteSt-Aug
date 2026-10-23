@@ -70,3 +70,7 @@ service-account*.json
 
 # Local deployment identity: never publish an active Site binding.
 /.openai/hosting.json
+
+# Markdown documentation stays local and is not published.
+*.[mM][dD]
+*.[mM][aA][rR][kK][dD][oO][wW][nN]

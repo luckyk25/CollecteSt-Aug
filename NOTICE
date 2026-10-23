@@ -1,0 +1,10 @@
+Visual asset credits
+
+The recycle pictogram is from Material Design Icons (Pictogrammers / Templarian), licensed under Apache-2.0.
+Source: https://github.com/Templarian/MaterialDesign/blob/master/svg/recycle.svg
+License: vendor/material-design-icons/LICENSE
+The original path is reproduced in public/visuals.mjs and the Ma collecte logo.
+
+The Ma collecte logo, wheeled bins, paper bag and symmetric leaf are custom drawings for this website. The bot avatar is rendered in SVG, PNG and JPEG from the same drawing.
+
+The bundled shadcn stylesheet license is preserved in vendor/shadcn-tailwind-4.13.0.LICENSE.
