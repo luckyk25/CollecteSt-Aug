@@ -6,7 +6,7 @@ import {ensureTelegramWebhook,webhookReady} from './telegram-webhook.mjs';
 export async function handleRequest(request,env,{fetcher=fetch,now=new Date()}={}){
  const path=new URL(request.url).pathname;
  if(!path.startsWith('/api/'))return env.ASSETS.fetch(request);
- let cookie;
+ let cookie,stage='routing';
  try{
   if(path==='/api/telegram/webhook'){
    if(request.method!=='POST')return secure(json({error:'Méthode non autorisée.'},405));
@@ -23,10 +23,13 @@ export async function handleRequest(request,env,{fetcher=fetch,now=new Date()}={
   if(request.method!==methods[path])return secure(json({error:'Méthode non autorisée.'},405));
   if(request.method!=='GET')sameOrigin(request);
   else if(request.headers.get('Sec-Fetch-Site')==='cross-site')return secure(json({error:'Accès refusé.'},403));
-  const action=path.split('/').at(-1);await rateLimit(env,request,action,now);
+  const action=path.split('/').at(-1);stage='rate_limit';await rateLimit(env,request,action,now);
+  stage='anonymous_session';
   const session=await anonymousSession(request);cookie=session.cookie;
   if(action==='status'){
+   stage='telegram_status';
    const status=await telegramStatus(env,session.ownerId,'',now);
+   stage='webhook_configuration';
    status.ready=status.ready&&await webhookReady(env,now);
    return secure(json(status),cookie);
   }
@@ -42,7 +45,10 @@ export async function handleRequest(request,env,{fetcher=fetch,now=new Date()}={
   if(!/^[a-f0-9-]{36}$/.test(id))return secure(json({error:'Abonnement invalide.'},400),cookie);
   if(action==='subscription')return secure(json(await removeTelegramRecipient(env,session.ownerId,id)),cookie);
   return secure(json(await testTelegramRecipient(env,session.ownerId,id,{fetcher,now})),cookie);
- }catch(error){return secure(failure(error),cookie);}
+ }catch(error){
+  if(!Number.isInteger(error?.status))console.error(JSON.stringify({event:'request_failed',stage,kind:error instanceof TypeError?'type_error':'runtime_error'}));
+  return secure(failure(error),cookie);
+ }
 }
 export default {
  fetch:handleRequest,
