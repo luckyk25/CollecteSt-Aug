@@ -1,2 +1,3 @@
-import {readFileSync,writeFileSync} from 'node:fs';
-writeFileSync('app/page-html.ts','export default '+JSON.stringify(readFileSync('page.html','utf8'))+';\n');
+import {writeFileSync} from 'node:fs';
+import {renderHtml} from './render-html.mjs';
+writeFileSync('app/page-html.ts','export default '+JSON.stringify(renderHtml())+';\n');

@@ -1,9 +1,10 @@
-import {cp,mkdir,rm,copyFile,readFile,writeFile} from 'node:fs/promises';
+import {cp,mkdir,rm,readFile,writeFile} from 'node:fs/promises';
 import {SECURITY_HEADERS} from '../worker/security.mjs';
+import {renderHtml} from './render-html.mjs';
 const output=new URL('../dist-cloudflare/',import.meta.url);
 await rm(output,{recursive:true,force:true});await mkdir(output,{recursive:true});
 await cp(new URL('../public/',import.meta.url),output,{recursive:true});
-await copyFile(new URL('../page.html',import.meta.url),new URL('index.html',output));
+await writeFile(new URL('index.html',output),renderHtml());
 await writeFile(new URL('_headers',output),'/*\n'+Object.entries(SECURITY_HEADERS).map(([name,value])=>`  ${name}: ${value}`).join('\n')+'\n');
 const html=await readFile(new URL('index.html',output),'utf8');
 if(/<script(?![^>]*\bsrc=)/i.test(html))throw new Error('Inline scripts are forbidden by the production policy.');

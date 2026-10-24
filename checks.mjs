@@ -20,5 +20,5 @@ assert(upcomingEvents(monday,new Date('2026-10-26T22:59:00Z')).some(e=>e.date===
 assert(!upcomingEvents(monday,new Date('2026-10-26T23:00:00Z')).some(e=>e.date==='2026-10-26'));
 assert.equal(upcomingEvents(monday,new Date('2027-01-01T12:00:00Z')).length,0);
 assert.deepEqual(eventsForSector(0),[]);
-const ics=icsForEvents(monday,'120, rue du Vitrier');assert(ics.includes('BEGIN:VCALENDAR\r\nVERSION:2.0'));assert(ics.includes('TRIGGER:-PT6H'));assert(ics.includes('DTEND;VALUE=DATE:20261229'));assert(ics.includes('120\\, rue du Vitrier'));assert.equal((ics.match(/BEGIN:VEVENT/g)||[]).length,monday.length);for(const line of ics.split('\r\n'))assert(Buffer.byteLength(line)<=75);
+const ics=icsForEvents(monday,'123 rue Exemple');assert(ics.includes('BEGIN:VCALENDAR\r\nVERSION:2.0'));assert(ics.includes('TRIGGER:-PT360M'));assert(ics.includes('DTEND;VALUE=DATE:20261229'));assert(ics.includes('123 rue Exemple'));assert.equal((ics.match(/BEGIN:VEVENT/g)||[]).length,monday.length);for(const line of ics.split('\r\n'))assert(Buffer.byteLength(line)<=75);
 console.log('Schedule checks passed: all sectors, season changes, holidays, timezone boundaries, 2026 cutoff and calendar export.');

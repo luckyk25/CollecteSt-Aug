@@ -1,5 +1,6 @@
 import {telegramReady,telegramRequest} from '../lib/telegram-core.mjs';
 import {digest} from './security.mjs';
+import {TELEGRAM} from '../lib/config.mjs';
 
 async function configuration(env){
  if(!telegramReady(env))return null;
@@ -18,7 +19,8 @@ export async function webhookReady(env,now=new Date()){
 // Runs only in the native scheduled task. Credentials stay in the Worker.
 export async function ensureTelegramWebhook(env,{fetcher=fetch,now=new Date()}={}){
  const config=await configuration(env);if(!config)return false;
- const saved=await env.DB.prepare("SELECT value FROM telegram_state WHERE key='webhook_config'").first();
+ const saved=await env.DB.prepare("SELECT value,until_at FROM telegram_state WHERE key='webhook_config'").first();
+ if(saved?.value===config.fingerprint&&saved.until_at>now.getTime()+TELEGRAM.webhookHealthMs-TELEGRAM.webhookCheckMs)return true;
  const info=await telegramRequest(env,'getWebhookInfo',{},fetcher);
  if(saved?.value!==config.fingerprint||info.url!==config.url){
   const bot=await telegramRequest(env,'getMe',{},fetcher);
@@ -28,6 +30,6 @@ export async function ensureTelegramWebhook(env,{fetcher=fetch,now=new Date()}={
   const confirmed=await telegramRequest(env,'getWebhookInfo',{},fetcher);
   if(confirmed.url!==config.url)throw new Error('Webhook verification failed.');
  }
- await env.DB.prepare("INSERT INTO telegram_state (key,value,until_at) VALUES ('webhook_config',?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value,until_at=excluded.until_at").bind(config.fingerprint,now.getTime()+15*60000).run();
+ await env.DB.prepare("INSERT INTO telegram_state (key,value,until_at) VALUES ('webhook_config',?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value,until_at=excluded.until_at").bind(config.fingerprint,now.getTime()+TELEGRAM.webhookHealthMs).run();
  return true;
 }

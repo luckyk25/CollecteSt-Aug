@@ -1,3 +1,5 @@
+import {REMINDERS,formatReminderTime} from './config.mjs';
+import {TYPES} from './schedule.mjs';
 const $=id=>document.getElementById(id);
 let address=null,config={ready:false,recipients:[]},pending=null,polling=false,loaded=false;
 export function updateTelegramAddress(value){address=value;}
@@ -17,14 +19,19 @@ function render(){
  for(const recipient of config.recipients){
   const row=document.createElement('article');row.className='telegram-recipient';
   const name=document.createElement('strong');name.textContent=recipient.username?'@'+recipient.username:recipient.name;
-  const info=document.createElement('p');info.textContent=`${recipient.address===`Secteur ${recipient.sector}`?recipient.address:`${recipient.address} · Secteur ${recipient.sector}`} · La veille à 18 h`;
-  const types=document.createElement('p');const labels={garbage:'Ordures',recycling:'Recyclage',green:'Résidus verts',bulky:'Encombrants'};types.textContent=recipient.types.map(t=>labels[t]).join(' · ');
+  const info=document.createElement('p');info.textContent=`${recipient.address===`Secteur ${recipient.sector}`?recipient.address:`${recipient.address} · Secteur ${recipient.sector}`} · La veille à ${formatReminderTime(recipient.reminderTime)}`;
+  const types=document.createElement('p');types.textContent=recipient.types.map(t=>TYPES[t].label).join(' · ');
   const actions=document.createElement('div');actions.className='telegram-actions';
   const test=document.createElement('button');test.type='button';test.className='button secondary';test.textContent='Envoyer un test';test.disabled=!config.ready;
   test.addEventListener('click',async()=>{test.disabled=true;try{const result=await api('test',{method:'POST',body:JSON.stringify({id:recipient.id})});feedback(result.message);}catch(e){feedback(e.message,true);}finally{test.disabled=!config.ready;}});
   const stop=document.createElement('button');stop.type='button';stop.className='text-button';stop.textContent='Désabonner';
   stop.addEventListener('click',async()=>{stop.disabled=true;try{const result=await api('subscription',{method:'DELETE',body:JSON.stringify({id:recipient.id})});config=await api('status');render();feedback(result.message);}catch(e){stop.disabled=false;feedback(e.message,true);}});
-  actions.append(test,stop);row.append(name,info,types,actions);list.append(row);
+  const timeForm=document.createElement('form');timeForm.className='telegram-time-form';
+  const label=document.createElement('label');label.htmlFor='reminder-'+recipient.id;label.textContent='Heure du rappel (Québec)';
+  const time=document.createElement('input');time.type='time';time.id=label.htmlFor;time.className='reminder-time';time.step=REMINDERS.stepSeconds;time.required=true;time.value=recipient.reminderTime;
+  const save=document.createElement('button');save.type='submit';save.className='button secondary';save.textContent='Enregistrer l’heure';save.disabled=!config.ready;
+  timeForm.addEventListener('submit',async event=>{event.preventDefault();save.disabled=true;try{const result=await api('subscription',{method:'PATCH',body:JSON.stringify({id:recipient.id,reminderTime:time.value})});config=await api('status');render();feedback(result.message);}catch(error){save.disabled=!config.ready;feedback(error.message,true);}});
+  timeForm.append(label,time,save);actions.append(test,stop);row.append(name,info,types,timeForm,actions);list.append(row);
  }
 }
 export async function loadTelegram(){
@@ -41,8 +48,10 @@ async function sync(){
  }catch(e){feedback(e.message,true);}finally{polling=false;}
 }
 export function openTelegram(){
- if(!address?.sector||!address?.streetId)return false;
- $('telegram-selected-address').textContent=address.address+` · Secteur ${address.sector}`;
+ const canConnect=!!(address?.sector&&address?.streetId);
+ if(!canConnect&&!config.recipients.length)return false;
+ $('telegram-form').hidden=!canConnect;
+ $('telegram-selected-address').textContent=canConnect?address.address+` · Secteur ${address.sector}`:'Vos abonnements existants. Pour connecter un autre compte, renseignez d’abord votre adresse sur le site.';
  $('telegram-dialog').showModal();render();loadTelegram().then(sync);return true;
 }
 $('close-telegram').addEventListener('click',()=>$('telegram-dialog').close());
@@ -52,13 +61,13 @@ $('telegram-form').addEventListener('submit',async event=>{
   if(!address?.sector)throw new Error('Recherchez d’abord votre adresse.');
   if(pending){await api('subscription',{method:'DELETE',body:JSON.stringify({id:pending.id})});pending=null;}
   const types=[...document.querySelectorAll('input[name="telegram-type"]:checked')].map(el=>el.value);
-  pending=await api('link',{method:'POST',body:JSON.stringify({types,consent:$('telegram-consent').checked,address:address.address,streetId:address.streetId,confirmedSector:address.method==='manual_confirmation'?address.sector:undefined})});
+  pending=await api('link',{method:'POST',body:JSON.stringify({reminderTime:$('telegram-reminder-time').value,...(address.location?{location:address.location}:{}),types,consent:$('telegram-consent').checked,address:address.address,streetId:address.streetId,confirmedSector:address.method==='manual_confirmation'?address.sector:undefined})});
   $('telegram-open-link').href=pending.url;$('telegram-link-value').value=pending.url;$('telegram-link-panel').hidden=false;
   feedback('Ouvrez ce lien dans Telegram et appuyez sur Démarrer. Pour un proche, copiez le lien et envoyez-le-lui.');
  }catch(e){feedback(e.message,true);}finally{button.disabled=!config.ready;}
 });
 $('telegram-copy-link').addEventListener('click',async()=>{
- try{await navigator.clipboard.writeText(pending.url);feedback('Lien copié. Envoyez-le à une seule personne : il est utilisable une fois, pendant 20 minutes.');}
+ try{await navigator.clipboard.writeText(pending.url);feedback(`Lien copié. Envoyez-le à une seule personne : il est utilisable une fois, pendant ${REMINDERS.inviteMinutes} minutes.`);}
  catch{$('telegram-link-value').focus();$('telegram-link-value').select();feedback('Sélectionnez et copiez ce lien pour le partager.');}
 });
 $('telegram-refresh').addEventListener('click',sync);
@@ -68,5 +77,5 @@ setInterval(()=>{
   pending=null;$('telegram-link-panel').hidden=true;feedback('Ce lien a expiré. Créez-en un nouveau pour vous connecter.',true);return;
  }
  sync();
-},5000);
+},REMINDERS.pollIntervalMs);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&$('telegram-dialog').open)sync();});

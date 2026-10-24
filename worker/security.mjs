@@ -1,8 +1,9 @@
 import {SmsError} from '../lib/sms-core.mjs';
+import {RATE_LIMITS} from '../lib/config.mjs';
 export const SECURITY_HEADERS={
  'Content-Security-Policy':"default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; object-src 'none'",
  'X-Content-Type-Options':'nosniff','X-Frame-Options':'DENY','Referrer-Policy':'no-referrer',
- 'Permissions-Policy':'camera=(), microphone=(), geolocation=(), payment=()',
+ 'Permissions-Policy':'camera=(), microphone=(), geolocation=(self), payment=()',
  'Cross-Origin-Opener-Policy':'same-origin','Cross-Origin-Resource-Policy':'same-origin',
  'Strict-Transport-Security':'max-age=31536000'
 };
@@ -33,8 +34,7 @@ export async function rateLimit(env,request,action,now=new Date()){
  const key=await crypto.subtle.importKey('raw',new TextEncoder().encode(env.RATE_LIMIT_SECRET),{name:'HMAC',hash:'SHA-256'},false,['sign']);
  const ipHash=Array.from(new Uint8Array(await crypto.subtle.sign('HMAC',key,new TextEncoder().encode(ip)))).map(n=>n.toString(16).padStart(2,'0')).join('');
  const day=now.toISOString().slice(0,10),hour=Math.floor(now.getTime()/3600000);
- const limits={link:[30,200],test:[10,200],subscription:[60,1000],status:[1200,20000],address:[200,10000]};
- const [perIp,global]=limits[action];
+ const [perIp,global]=RATE_LIMITS[action];
  await env.DB.prepare('DELETE FROM sms_rate_limits WHERE day<?').bind(day).run();
  for(const [id,max] of [[`cf:${action}:ip:${ipHash}:${hour}`,perIp],[`cf:${action}:all:${day}`,global]]){
   const claimed=await env.DB.prepare('INSERT INTO sms_rate_limits (key,day,count,last_at) VALUES (?,?,1,?) ON CONFLICT(key) DO UPDATE SET count=count+1,last_at=excluded.last_at WHERE count<? RETURNING count').bind(id,day,now.getTime(),max).first();

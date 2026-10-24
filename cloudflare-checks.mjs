@@ -29,9 +29,10 @@ const setupFetcher=async(url,options)=>{
 assert.equal(await ensureTelegramWebhook(env,{fetcher:setupFetcher,now}),true);
 assert.equal(await webhookReady(env,now),true);
 assert.deepEqual(bootstrap,['getWebhookInfo','getMe','setWebhook','getWebhookInfo']);
-bootstrap=[];await ensureTelegramWebhook(env,{fetcher:setupFetcher,now});assert.deepEqual(bootstrap,['getWebhookInfo']);
+bootstrap=[];await ensureTelegramWebhook(env,{fetcher:setupFetcher,now});assert.deepEqual(bootstrap,[]);
+await ensureTelegramWebhook(env,{fetcher:setupFetcher,now:new Date(now.getTime()+5*60000)});assert.deepEqual(bootstrap,['getWebhookInfo']);
 assert.equal(await webhookReady({...env,TELEGRAM_WEBHOOK_SECRET:'rotated_secret_'.padEnd(64,'y')},now),false);
-assert.equal(await webhookReady(env,new Date(now.getTime()+16*60000)),false);
+assert.equal(await webhookReady(env,new Date(now.getTime()+21*60000)),false);
 assert.equal(await ensureTelegramWebhook({...env,TELEGRAM_ENABLED:'false'},{fetcher:()=>{throw Error('Should not contact Telegram')},now}),false);
 await assert.rejects(ensureTelegramWebhook({...env,PUBLIC_ORIGIN:'http://evil.example'},{fetcher:setupFetcher,now}));
 await assert.rejects(ensureTelegramWebhook({...env,TELEGRAM_BOT_USERNAME:'different_bot'},{fetcher:async url=>Response.json({ok:true,result:url.endsWith('/getMe')?{username:'wrong_bot'}:{url:webhookUrl}}),now}));
@@ -45,7 +46,7 @@ assert.equal(response.status,200);const firstCookie=cookieOf(response),initial=a
 assert(response.headers.get('Set-Cookie').includes('HttpOnly'));assert(response.headers.get('Set-Cookie').includes('SameSite=Strict'));assert(response.headers.get('Set-Cookie').includes('Secure'));
 assert(response.headers.get('Content-Security-Policy').includes("script-src 'self'"));assert.equal(response.headers.get('Cache-Control'),'no-store');
 response=await call(req('/api/telegram/status',{extra:{'oai-authenticated-user-id':'forged-admin'}}));const otherCookie=cookieOf(response);assert.notEqual(firstCookie,otherCookie);assert.equal((await response.json()).recipients.length,0);
-const input={address:'120 rue du Vitrier',streetId:'20067',types:['garbage','green'],consent:true};
+const input={address:'492 3e Rang',streetId:'5229',types:['garbage','green'],consent:true};
 assert.equal((await call(req('/api/telegram/link',{method:'POST',cookie:firstCookie,data:input,origin:'https://evil.example'}))).status,403);
 assert.equal((await call(new Request('https://collecte.example/api/telegram/link',{method:'POST',headers:{Cookie:firstCookie,'Content-Type':'application/json'},body:JSON.stringify(input)}))).status,403);
 response=await call(req('/api/telegram/link',{method:'POST',cookie:firstCookie,data:input}));assert.equal(response.status,200);const link=await response.json();
@@ -60,6 +61,14 @@ assert.equal((await (await call(req('/api/telegram/status',{cookie:otherCookie,e
 const id=own.recipients[0].id;
 assert.equal((await call(req('/api/telegram/test',{method:'POST',cookie:otherCookie,data:{id}}))).status,404);
 await call(req('/api/telegram/subscription',{method:'DELETE',cookie:otherCookie,data:{id}}));assert(sqlite.prepare('SELECT id FROM telegram_subscriptions WHERE id=?').get(id));
+assert.equal((await call(req('/api/telegram/subscription',{method:'PATCH',cookie:otherCookie,data:{id,reminderTime:'07:37'}}))).status,404);
+assert.equal((await call(req('/api/telegram/subscription',{method:'PATCH',cookie:firstCookie,data:{id,reminderTime:'24:00'}}))).status,400);
+assert.equal((await call(req('/api/telegram/subscription',{method:'PATCH',cookie:firstCookie,data:{id}}))).status,400);
+assert.equal((await call(req('/api/telegram/subscription',{method:'PATCH',cookie:firstCookie,data:{id,reminderTime:'07:37'}}))).status,200);
+assert.equal((await (await call(req('/api/telegram/status',{cookie:firstCookie}))).json()).recipients[0].reminderTime,'07:37');
+await call(req('/api/telegram/subscription',{method:'PATCH',cookie:firstCookie,data:{id,reminderTime:'18:00'}}));
+assert.equal((await call(req('/api/location',{method:'POST',origin:'https://evil.example',data:{}}))).status,403);
+assert.equal((await call(req('/api/location',{method:'POST',data:{latitude:0,longitude:0,accuracy:5}}))).status,400);
 // Reassociation requires confirmation in the actual private Telegram chat.
 const newLink=await (await call(req('/api/telegram/link',{method:'POST',cookie:otherCookie,data:input}))).json();
 assert.equal((await call(webhook(update(2,newLink)))).status,200);
@@ -67,7 +76,7 @@ assert.equal((await (await call(req('/api/telegram/status',{cookie:firstCookie})
 assert.equal((await (await call(req('/api/telegram/status',{cookie:otherCookie}))).json()).recipients[0].id,id);
 for(const path of ['/api/reminders/dispatch','/api/telegram/sync','/api/sms/start','/api/admin'])assert.equal((await call(req(path,{method:'POST',data:{}}))).status,404);
 const count=calls.length;assert.equal((await dispatchTelegram(env,{now:new Date('2026-10-25T22:00:00Z'),fetcher})).accepted,1);assert(calls.length>count);assert(calls.every(c=>c.url.endsWith('/sendMessage')));
-assert.equal((await dispatchTelegram(env,{now:new Date('2026-10-25T22:05:00Z'),fetcher})).skipped,1);
+assert.equal((await dispatchTelegram(env,{now:new Date('2026-10-25T22:04:00Z'),fetcher})).skipped,1);
 await call(webhook({update_id:3,message:{chat:{id:101,type:'private'},from:{id:101},text:'/stop'}}));assert.equal(sqlite.prepare('SELECT count(*) AS n FROM telegram_subscriptions').get().n,0);
 for(let i=0;i<30;i++)await rateLimit(env,new Request('https://collecte.example',{headers:{'CF-Connecting-IP':'192.0.2.80'}}),'link',now);
 await assert.rejects(rateLimit(env,new Request('https://collecte.example',{headers:{'CF-Connecting-IP':'192.0.2.80'}}),'link',now),e=>e.status===429);

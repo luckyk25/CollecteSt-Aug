@@ -12,7 +12,7 @@
     "start": "node --import ./scripts/sites-env.mjs ./node_modules/wrangler/bin/wrangler.js dev --config dist/server/wrangler.json --local --persist-to .wrangler/state --ip 127.0.0.1 --inspector-port 0",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "drizzle-kit generate",
-    "test": "node checks.mjs && node server-checks.mjs && node telegram-checks.mjs && node api-checks.mjs && node cloudflare-checks.mjs",
+    "test": "node checks.mjs && node server-checks.mjs && node telegram-checks.mjs && node api-checks.mjs && node cloudflare-checks.mjs && node preferences-checks.mjs",
     "typecheck": "tsc --noEmit --incremental false",
     "check:secrets": "node scripts/check-secrets.mjs",
     "predev": "node scripts/prepare-local-config.mjs",

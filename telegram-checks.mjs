@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict';
 import {DatabaseSync} from 'node:sqlite';
 import {readFileSync,readdirSync} from 'node:fs';
-import {createTelegramLink,telegramStatus,syncTelegram,dispatchTelegram,testTelegramRecipient,removeTelegramRecipient,telegramReady} from './lib/telegram-core.mjs';
+import {createTelegramLink,telegramStatus,syncTelegram,dispatchTelegram,testTelegramRecipient,removeTelegramRecipient,telegramReady,updateTelegramReminderTime} from './lib/telegram-core.mjs';
 const sqlite=new DatabaseSync(':memory:');
 for(const name of readdirSync('drizzle').filter(n=>n.endsWith('.sql')).sort())sqlite.exec(readFileSync('drizzle/'+name,'utf8'));
 const db={prepare(sql){return {async first(){return sqlite.prepare(sql).get()||null},async all(){return {results:sqlite.prepare(sql).all()}},bind(...v){return {async first(){return sqlite.prepare(sql).get(...v)||null},async all(){return {results:sqlite.prepare(sql).all(...v)}},async run(){return sqlite.prepare(sql).run(...v)}}}}},async batch(statements){sqlite.exec('BEGIN');try{const out=[];for(const q of statements)out.push(await q.run());sqlite.exec('COMMIT');return out;}catch(e){sqlite.exec('ROLLBACK');throw e;}}};
 const env={DB:db,TELEGRAM_ENABLED:'true',TELEGRAM_SCHEDULER_READY:'true',TELEGRAM_BOT_TOKEN:'123456789:'+''.padEnd(32,'x'),TELEGRAM_BOT_USERNAME:'ma_collecte_test_bot'};
-const now=new Date('2026-10-22T22:00:00Z'),address={address:'120 rue du Vitrier',streetId:'20067',sector:1},input={types:['garbage','recycling','green'],consent:true};
+const now=new Date('2026-10-22T22:00:00Z'),address={address:'492 3e Rang',streetId:'5229',sector:1},input={types:['garbage','recycling','green'],consent:true};
 let updates=[],calls=[],nextMessage=1;
 const fetcher=async(url,options)=>{
  const method=url.split('/').at(-1),body=JSON.parse(options.body);calls.push({method,body});
@@ -99,3 +99,37 @@ assert.equal(sqlite.prepare("SELECT value FROM telegram_state WHERE key='offset'
 assert.equal(sqlite.prepare("SELECT value FROM telegram_state WHERE key='sync_lease'").get().value,'other-worker');
 sqlite.prepare("DELETE FROM telegram_state WHERE key='sync_lease'").run();
 console.log('Concurrency checks passed: atomic family limit, bounded polling, resumable offset and lease ownership.');
+
+// Each account retains its own local time, including changes and repeated jobs.
+const early=await createTelegramLink(env,'time-owner',{...input,reminderTime:'07:37'},address,now);
+const late=await createTelegramLink(env,'time-owner',{...input,reminderTime:'19:15'},address,now);
+updates=[start(12,501,early),start(13,502,late)];await syncTelegram(env,{now,fetcher});
+const timed=(await telegramStatus(env,'time-owner')).recipients;
+assert.equal(timed.find(r=>r.username==='family_501').reminderTime,'07:37');
+assert.equal(timed.find(r=>r.username==='family_502').reminderTime,'19:15');
+assert.equal((await dispatchTelegram(env,{now:new Date('2026-10-25T11:36:59Z'),fetcher})).status,'outside_delivery_window');
+assert.equal((await dispatchTelegram(env,{now:new Date('2026-10-25T11:37:00Z'),fetcher})).accepted,1);
+assert.equal((await dispatchTelegram(env,{now:new Date('2026-10-25T11:38:00Z'),fetcher})).skipped,1);
+const earlyId=timed.find(r=>r.username==='family_501').id;
+await assert.rejects(updateTelegramReminderTime(env,'other-owner',earlyId,'12:00',now),e=>e.status===404);
+for(const time of ['24:00','18:60','8:00','12:30:00',null,12,undefined])await assert.rejects(updateTelegramReminderTime(env,'time-owner',earlyId,time,now),e=>e.code==='invalid_time');
+await updateTelegramReminderTime(env,'time-owner',earlyId,'19:15',now);
+assert.equal((await dispatchTelegram(env,{now:new Date('2026-10-25T23:15:00Z'),fetcher})).accepted,1);
+assert.equal((await dispatchTelegram(env,{now:new Date('2026-10-25T23:16:00Z'),fetcher})).skipped,2);
+updates=[{update_id:14,message:{chat:{id:501,type:'private'},from:{id:501},text:'/status'}}];await syncTelegram(env,{now,fetcher});
+assert(calls.at(-1).body.text.includes('19 h 15'));
+console.log('Custom Telegram times passed: minute precision, independent family schedules, owner-only changes, strict validation, status text and duplicate prevention after changing the time.');
+
+// Twenty simultaneous reminders finish in bounded batches on the free plan.
+updates=[];
+for(let i=0;i<20;i++){
+ const batchLink=await createTelegramLink(env,'batch-owner-'+Math.floor(i/10),input,address,now);
+ updates.push(start(15+i,600+i,batchLink));
+}
+await syncTelegram(env,{now,fetcher});
+const batchNow=new Date('2026-10-25T22:00:00Z');
+assert.equal((await dispatchTelegram(env,{now:batchNow,fetcher})).accepted,8);
+assert.equal((await dispatchTelegram(env,{now:new Date(batchNow.getTime()+60000),fetcher})).accepted,8);
+assert.equal((await dispatchTelegram(env,{now:new Date(batchNow.getTime()+120000),fetcher})).accepted,4);
+assert.equal((await dispatchTelegram(env,{now:new Date(batchNow.getTime()+180000),fetcher})).skipped,20);
+console.log('Free-plan batch checks passed: twenty reminders delivered once across bounded invocations.');

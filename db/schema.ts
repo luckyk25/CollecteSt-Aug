@@ -1,3 +1,4 @@
+import {REMINDERS} from '../public/config.mjs';
 import { integer, sqliteTable, text, index, uniqueIndex } from 'drizzle-orm/sqlite-core';
 export const subscriptions = sqliteTable('sms_subscriptions', {
  userId: text('user_id').primaryKey(), phone: text('phone').notNull(), address: text('address').notNull(),
@@ -20,12 +21,12 @@ export const deliveries = sqliteTable('sms_deliveries',{
 
 export const telegramInvites=sqliteTable('telegram_invites',{
  id:text('id').primaryKey(),ownerId:text('owner_id').notNull(),tokenHash:text('token_hash').notNull(),
- address:text('address').notNull(),streetId:text('street_id').notNull(),sector:integer('sector').notNull(),types:text('types').notNull(),
+ address:text('address').notNull(),streetId:text('street_id').notNull(),sector:integer('sector').notNull(),types:text('types').notNull(),reminderTime:text('reminder_time').notNull().default(REMINDERS.defaultTime),
  expiresAt:integer('expires_at').notNull(),createdAt:text('created_at').notNull()
 },t=>[uniqueIndex('telegram_invite_token_unique').on(t.tokenHash),index('telegram_invite_owner').on(t.ownerId),index('telegram_invite_expiry').on(t.expiresAt)]);
 export const telegramSubscriptions=sqliteTable('telegram_subscriptions',{
  id:text('id').primaryKey(),ownerId:text('owner_id').notNull(),chatId:text('chat_id').notNull(),displayName:text('display_name').notNull(),username:text('username').notNull(),
- address:text('address').notNull(),streetId:text('street_id').notNull(),sector:integer('sector').notNull(),types:text('types').notNull(),
+ address:text('address').notNull(),streetId:text('street_id').notNull(),sector:integer('sector').notNull(),types:text('types').notNull(),reminderTime:text('reminder_time').notNull().default(REMINDERS.defaultTime),
  consentAt:text('consent_at').notNull(),consentVersion:text('consent_version').notNull(),createdAt:text('created_at').notNull(),updatedAt:text('updated_at').notNull()
 },t=>[uniqueIndex('telegram_chat_unique').on(t.chatId),index('telegram_subscription_owner_created').on(t.ownerId,t.createdAt)]);
 export const telegramDeliveries=sqliteTable('telegram_deliveries',{

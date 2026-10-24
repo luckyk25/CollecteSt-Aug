@@ -1,8 +1,9 @@
 import {json,body,failure,sameOrigin} from '../lib/api.mjs';
-import {lookupAddress,resolveSelection} from '../lib/addresses.mjs';
-import {telegramStatus,createTelegramLink,removeTelegramRecipient,testTelegramRecipient,processTelegramWebhook,dispatchTelegram} from '../lib/telegram-core.mjs';
+import {lookupAddress,lookupLocation,resolveSelection} from '../lib/addresses.mjs';
+import {telegramStatus,createTelegramLink,removeTelegramRecipient,updateTelegramReminderTime,testTelegramRecipient,processTelegramWebhook,dispatchTelegram} from '../lib/telegram-core.mjs';
 import {anonymousSession,secure,rateLimit,secretMatches} from './security.mjs';
 import {ensureTelegramWebhook,webhookReady} from './telegram-webhook.mjs';
+import {API} from '../lib/config.mjs';
 export async function handleRequest(request,env,{fetcher=fetch,now=new Date()}={}){
  const path=new URL(request.url).pathname;
  if(!path.startsWith('/api/'))return env.ASSETS.fetch(request);
@@ -11,16 +12,21 @@ export async function handleRequest(request,env,{fetcher=fetch,now=new Date()}={
   if(path==='/api/telegram/webhook'){
    if(request.method!=='POST')return secure(json({error:'Méthode non autorisée.'},405));
    if(request.headers.has('Origin')||!await secretMatches(request.headers.get('X-Telegram-Bot-Api-Secret-Token'),env.TELEGRAM_WEBHOOK_SECRET))return secure(json({error:'Accès refusé.'},403));
-   const result=await processTelegramWebhook(env,await body(request,32768),{fetcher,now});
+   const result=await processTelegramWebhook(env,await body(request,API.maxWebhookBytes),{fetcher,now});
    return secure(json({ok:true,status:result.status}));
   }
   if(path==='/api/address'&&request.method==='GET'){
    await rateLimit(env,request,'address',now);
    return secure(json(lookupAddress(new URL(request.url).searchParams.get('q'))));
   }
-  const methods={'/api/telegram/status':'GET','/api/telegram/link':'POST','/api/telegram/subscription':'DELETE','/api/telegram/test':'POST'};
+  if(path==='/api/location'){
+   if(request.method!=='POST')return secure(json({error:'Méthode non autorisée.'},405));
+   sameOrigin(request);await rateLimit(env,request,'location',now);
+   return secure(json(lookupLocation(await body(request))));
+  }
+  const methods={'/api/telegram/status':['GET'],'/api/telegram/link':['POST'],'/api/telegram/subscription':['DELETE','PATCH'],'/api/telegram/test':['POST']};
   if(!methods[path])return secure(json({error:'Introuvable.'},404));
-  if(request.method!==methods[path])return secure(json({error:'Méthode non autorisée.'},405));
+  if(!methods[path].includes(request.method))return secure(json({error:'Méthode non autorisée.'},405));
   if(request.method!=='GET')sameOrigin(request);
   else if(request.headers.get('Sec-Fetch-Site')==='cross-site')return secure(json({error:'Accès refusé.'},403));
   const action=path.split('/').at(-1);stage='rate_limit';await rateLimit(env,request,action,now);
@@ -36,13 +42,14 @@ export async function handleRequest(request,env,{fetcher=fetch,now=new Date()}={
   const input=await body(request);
   if(action==='link'){
    if(!await webhookReady(env,now))return secure(json({error:'Les rappels Telegram sont en cours d’activation. Réessayez dans quelques minutes.'},503),cookie);
-   const selected=resolveSelection(input.address,input.streetId,input.confirmedSector);
+   const selected=resolveSelection(input.address,input.streetId,input.confirmedSector,input.location);
    // The full street/civic address stays in the visitor's browser.
    const address={address:`Secteur ${selected.sector}`,streetId:'',sector:selected.sector};
    return secure(json(await createTelegramLink(env,session.ownerId,input,address,now)),cookie);
   }
   const id=typeof input.id==='string'?input.id:'';
-  if(!/^[a-f0-9-]{36}$/.test(id))return secure(json({error:'Abonnement invalide.'},400),cookie);
+  if(!API.subscriptionIdPattern.test(id))return secure(json({error:'Abonnement invalide.'},400),cookie);
+  if(action==='subscription'&&request.method==='PATCH')return secure(json(await updateTelegramReminderTime(env,session.ownerId,id,input.reminderTime,now)),cookie);
   if(action==='subscription')return secure(json(await removeTelegramRecipient(env,session.ownerId,id)),cookie);
   return secure(json(await testTelegramRecipient(env,session.ownerId,id,{fetcher,now})),cookie);
  }catch(error){
